@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spectrum-modeler"
+version = "0.0.0"
+description = "Model how pluck position shapes the overtones of a classical guitar string."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+audio = ["sounddevice"]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+spectrum_modeler = ["data/**/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["slow: takes more than a few seconds (skip with -m 'not slow')"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.format]
+exclude = ["*.md"]  # leave code samples in docs as written
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "NPY",  # numpy-specific rules
+    "RUF",  # ruff-specific rules
+]
+allowed-confusables = ["σ", "β", "–", "−", "×"]  # deliberate in plot labels

@@ -1,0 +1,15 @@
+name: spectrum-modeler
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - matplotlib
+  - ffmpeg               # decoding recordings; exporting animations
+  - python-sounddevice   # live playback
+  - pytest
+  - ruff
+  - pip
+  - pip:
+      - -e .

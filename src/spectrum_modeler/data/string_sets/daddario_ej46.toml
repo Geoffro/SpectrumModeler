@@ -1,0 +1,32 @@
+name = "D'Addario Pro-Arté Nylon, Hard Tension (EJ46)"
+source = "D'Addario product page"
+
+# Optional per string, for inharmonicity. Either both of:
+#   diameter_mm = ...
+#   youngs_modulus_gpa = ...
+# or B directly:
+#   inharmonicity_b = ...
+
+[strings.E4]
+item = "J4601"
+tension_lbf = 16.8
+
+[strings.B3]
+item = "J4602"
+tension_lbf = 12.4
+
+[strings.G3]
+item = "J4603"
+tension_lbf = 12.3
+
+[strings.D3]
+item = "J4604"
+tension_lbf = 16.2
+
+[strings.A2]
+item = "J4605"
+tension_lbf = 17.0
+
+[strings.E2]
+item = "J4606"
+tension_lbf = 15.2
