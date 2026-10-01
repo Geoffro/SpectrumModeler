@@ -1,16 +1,15 @@
-"""The SpectrumModeler app: explorer, pluck comparison, string animation, and tuner in tabs.
+"""The SpectrumModeler app: explorer, pluck comparison, and tuner in tabs.
 
 One dark-themed Tk window. The Explorer and Tuner tabs are the matplotlib
-windows from ``viz/explorer.py`` and ``viz/tuner.py``, embedded; the Compare and
-Animate tabs have their controls in a sidebar. Files exported from the app
-match what ``compare_positions.py`` and ``animate_string.py`` write (light theme).
+windows from ``viz/explorer.py`` and ``viz/tuner.py``, embedded; the Compare tab
+has its controls in a sidebar. Files exported from the app match what
+``compare_positions.py`` writes (light theme).
 
 A recording session and a guitar profile are opened from the bar at the top,
 and remembered for next time.
 """
 
 import json
-import time
 import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -18,31 +17,19 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import numpy as np
-from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from ..analysis import spectral_centroid, spectrogram
 from ..audio import match_loudness, sequence, write_wav
 from ..explorer import EDGE_MM, ExplorerState, Settings
-from ..fdtd import FdtdResult
 from ..measure import load_session_measurements
-from ..modal import coefficients
-from ..params import ModelOptions
-from ..presets import FINGER_WIDTHS_MM, OPEN_STRING_NOTES, PLUCK_PRESETS, pluck, pluck_position_mm
+from ..presets import FINGER_WIDTHS_MM, OPEN_STRING_NOTES, PLUCK_PRESETS, pluck_position_mm
 from ..profile import PROFILE_DIR, load_profile
 from ..recording import SAMPLE_RATE, Session
 from ..string_sets import DEFAULT_STRING_SET
 from ..tuning import TunerState
 from . import style
-from .animate import (
-    StringFrames,
-    plot_filmstrip,
-    plot_modal_check,
-    save_animation,
-    simulate_for_animation,
-    string_frames,
-)
 from .explorer import LAYERS, ExplorerApp
 from .shape import plot_mode_decomposition
 from .spectrogram import plot_spectrogram_pair
@@ -50,9 +37,8 @@ from .spectrum import describe, plot_comparison
 from .style import C
 from .tuner import TunerApp
 
-TABS = {"explore": "Explorer", "compare": "Compare", "animate": "Animate", "tune": "Tuner"}
+TABS = {"explore": "Explorer", "compare": "Compare", "tune": "Tuner"}
 COMPARE_SECONDS = 4.0  # audio for spectrograms, playback, and export
-FPS = 30
 EXPORT_DIR = Path("output")
 CONFIG_PATH = Path.home() / ".config" / "spectrum-modeler" / "app.json"
 
@@ -382,209 +368,6 @@ class CompareTab(_Tab):
         return written
 
 
-# --- Animate ------------------------------------------------------------------------------------
-
-
-class Player:
-    """Plays ``StringFrames`` on an embedded canvas, redrawing only the moving artists.
-
-    Full redraws of the animation figure take longer than a frame, so the rest is
-    kept as a background image, captured on each full draw (first show, resize).
-    Frames follow the clock: if the screen can't keep up (Tk on macOS repaints
-    the whole canvas each time), frames are skipped and the slow-motion factor holds.
-    """
-
-    def __init__(self, frames: StringFrames, fps: int) -> None:
-        self.frames = frames
-        self.fps = fps
-        self.played = 0.0  # s of animation shown
-        self.frame = 0
-        self._background = None
-        for artist in frames.moving:
-            artist.set_animated(True)  # left out of full draws; drawn over the background
-        frames.update(0)
-        self._cid = frames.fig.canvas.mpl_connect("draw_event", self._on_draw)
-
-    def _on_draw(self, _event) -> None:
-        canvas = self.frames.fig.canvas
-        self._background = canvas.copy_from_bbox(self.frames.fig.bbox)
-        self._draw_moving()
-
-    def _draw_moving(self) -> None:
-        for artist in self.frames.moving:
-            self.frames.fig.draw_artist(artist)
-
-    def advance(self, seconds: float) -> None:
-        """Move the animation on by ``seconds`` of playing time."""
-        if self._background is None:  # not drawn yet
-            return
-        self.played += seconds
-        frame = int(self.played * self.fps) % self.frames.n_frames
-        if frame == self.frame:
-            return
-        self.frame = frame
-        self.frames.update(frame)
-        canvas = self.frames.fig.canvas
-        canvas.restore_region(self._background)
-        self._draw_moving()
-        for ax in {artist.axes for artist in self.frames.moving}:
-            canvas.blit(ax.bbox)
-
-    def close(self) -> None:
-        self.frames.fig.canvas.mpl_disconnect(self._cid)
-
-
-class AnimateTab(_Tab):
-    """The simulated string in slow motion, a one-period filmstrip, or the modal check."""
-
-    VIEWS = ("animation", "filmstrip", "check against modal model")
-
-    def __init__(self, parent: tk.Widget, state: ExplorerState) -> None:
-        super().__init__(parent)
-        self.state = state
-        side = Sidebar(parent, self.schedule)
-        self.fig = _embed(parent)
-        self.note = side.combo("String", OPEN_STRING_NOTES, state.settings.note)
-        self.position = side.combo(
-            "Pluck (preset or mm)", PLUCK_PRESETS, "ponticello", editable=True
-        )
-        self.finger = side.combo("Finger", FINGER_WIDTHS_MM, "ideal")
-        side.heading("Layers")
-        self.damping = side.check("damping", False)
-        self.periods = side.spin("Periods", 0.5, 20, 0.5, 2)
-        self.slowdown = side.spin("Times slower than real time", 10, 2000, 10, 250)
-        self.view = side.radios("View", self.VIEWS, self.VIEWS[0])
-        side.heading("Export format")
-        self.format = tk.StringVar(value="mp4")
-        ttk.Combobox(side, textvariable=self.format, values=["mp4", "gif"], width=6,
-                     state="readonly").pack(anchor="w")  # fmt: skip
-        self.buttons = side.buttons([("Pause", self.toggle), ("Export…", self.export)])
-        self.status = side.status()
-        self.player: Player | None = None
-        self.paused = False
-        self.visible = True
-        self._key = None
-        self.result: FdtdResult | None = None
-        self.schedule(0)
-        self._last_tick = time.perf_counter()
-        self._tick()
-
-    def simulation(self) -> FdtdResult:
-        """The simulated string for the current settings (kept until they change)."""
-        note = self.note.get()
-        mm = self.position_mm("Pluck", self.position.get(), self.state)
-        try:
-            periods, slowdown = float(self.periods.get()), float(self.slowdown.get())
-        except (tk.TclError, ValueError):
-            raise ValueError("Periods and slowdown must be numbers") from None
-        key = (note, mm, self.finger.get(), self.damping.get(), periods, slowdown)
-        if key != self._key:
-            self.result = simulate_for_animation(
-                self.state.strings[note],
-                pluck(mm, length=self.state.length, finger=self.finger.get()),
-                periods=periods, slowdown=slowdown, fps=FPS, damping=self.damping.get(),
-            )  # fmt: skip
-            self._key = key
-        return self.result
-
-    def draw(self, fig: Figure, view: str):
-        """The figure for ``view``, or the animation's frames for "animation"."""
-        result = self.simulation()
-        if view == "animation":
-            return string_frames(result, slowdown=self._key[-1], fps=FPS, fig=fig)
-        if view == "filmstrip":
-            return plot_filmstrip(result, fig=fig)
-        _, _, _, damped, _, _ = self._key
-        if damped:
-            raise ValueError("The modal check compares the lossless string: untick damping")
-        modal = coefficients(
-            result.string, result.pluck, ModelOptions(n_harmonics=20, damping=False)
-        )
-        return plot_modal_check(result, modal, fig=fig)
-
-    def redraw(self) -> None:
-        if self.player is not None:
-            self.player.close()
-            self.player = None
-        view = self.view.get()
-        try:
-            drawn = self.draw(self.fig, view)
-        except ValueError:
-            style.figure(self.fig, (1, 1))  # blank, not a stale view
-            self.fig.canvas.draw_idle()
-            raise
-        if view == "animation":
-            self.player = Player(drawn, FPS)
-        self.fig.canvas.draw_idle()
-        r = self.result
-        self.status.set(f"{r.x.size - 1} grid intervals, Courant number {r.courant:.3f}")
-
-    def _tick(self) -> None:
-        """Advance the animation, while the tab is showing and not paused."""
-        now = time.perf_counter()
-        if self.player is not None and self.visible and not self.paused:
-            self.player.advance(now - self._last_tick)
-        self._last_tick = now
-        elapsed_ms = (time.perf_counter() - now) * 1000
-        self._timer = self.parent.after(max(1, round(1000 / FPS - elapsed_ms)), self._tick)
-
-    def stop(self) -> None:
-        self.cancel()
-        self.parent.after_cancel(self._timer)
-
-    def toggle(self) -> None:
-        self.paused = not self.paused
-        self.buttons["Pause"].configure(text="Play" if self.paused else "Pause")
-
-    def set_visible(self, visible: bool) -> None:
-        """Only animate while the tab is showing."""
-        self.visible = visible
-
-    def export(self, out: Path | None = None) -> list[Path]:
-        """Write what animate_string.py writes for these settings."""
-        if out is None:
-            chosen = filedialog.askdirectory(
-                title="Export animation to…",
-                initialdir=(EXPORT_DIR / "animation").resolve(),
-                mustexist=False,
-            )
-            if not chosen:
-                return []
-            out = Path(chosen)
-        result = self.simulation()
-        stem = (
-            f"{result.string.note}_{_slug(self.position.get().strip(), result.pluck.distance_mm)}"
-        )
-        out.mkdir(parents=True, exist_ok=True)
-        top = self.parent.winfo_toplevel()
-        top.configure(cursor="watch")
-        self.status.set("exporting…")
-        top.update_idletasks()
-        written = []
-        try:
-            with style.using_theme("light"):
-                views = {f"{stem}_filmstrip.png": "filmstrip"}
-                if not self.damping.get():
-                    views[f"{stem}_check.png"] = "check against modal model"
-                for name, view in views.items():
-                    self.draw(None, view).savefig(out / name)
-                    written.append(out / name)
-                frames = self.draw(None, "animation")
-                animation = FuncAnimation(
-                    frames.fig, frames.update, frames=frames.n_frames, interval=1000 / FPS
-                )
-                written.append(
-                    save_animation(animation, out / f"{stem}.{self.format.get()}", fps=FPS)
-                )
-        except Exception as e:  # no ffmpeg, a full disk, ...
-            self.status.set(f"export failed: {e}")
-            return written
-        finally:
-            top.configure(cursor="")
-        self.status.set(f"wrote {len(written)} files to {out}")
-        return written
-
-
 # --- What is open ------------------------------------------------------------------------------
 
 
@@ -737,7 +520,6 @@ class App:
     def _build(self, loaded: Loaded, tab: str) -> None:
         if self.notebook is not None:
             self.compare.cancel()
-            self.animate.stop()
             self.notebook.destroy()
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True)
@@ -749,7 +531,6 @@ class App:
         explorer = loaded.explorer
         self.explorer = ExplorerApp(explorer, fig=_embed(frames["explore"]))
         self.compare = CompareTab(frames["compare"], explorer)
-        self.animate = AnimateTab(frames["animate"], explorer)
         self.tuner = None
         if loaded.tuner is not None:
             self.tuner = TunerApp(loaded.tuner, fig=_embed(frames["tune"]))
@@ -758,7 +539,6 @@ class App:
             fig.text(0.5, 0.5, loaded.tuner_hint, ha="center", va="center",
                      color=C.INK_SECONDARY, fontsize=11, linespacing=1.8)  # fmt: skip
 
-        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab)
         self.notebook.select(list(TABS).index(tab))
 
     def open_session(self, path: Path | None) -> None:
@@ -813,14 +593,9 @@ class App:
 
     # --- Window ----------------------------------------------------------------------------------
 
-    def _on_tab(self, _event=None) -> None:
-        selected = self.notebook.index(self.notebook.select())
-        self.animate.set_visible(list(TABS)[selected] == "animate")
-
     def close(self) -> None:
         if not self._unsaved_handled():
             return
         self.compare.cancel()
-        self.animate.stop()
         self.root.quit()
         self.root.destroy()

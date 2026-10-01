@@ -408,7 +408,7 @@ SpectrumModeler/
 │   ├── import_recordings.py # decode, check manifest, segment
 │   ├── analyze.py           # measure a session, or any single file (ad-hoc); plot
 │   ├── calibrate.py         # fit profile from measurements
-│   ├── app.py               # launch the app: explorer, compare, animate, tuner
+│   ├── app.py               # launch the app: explorer, compare, tuner
 │   ├── new_manifest.py      # write a session's manifest before recording
 │   ├── animate_string.py    # simulate and animate the string (§2.4)
 │   └── compare_recordings.py # two recordings: spectrograms, difference, harmonics (§6)
@@ -517,9 +517,8 @@ Design principle: the computational code (`modal`, `synthesis`, `measure`, `cali
 
     A literal overlay of two spectrograms is not used: blended colour maps make both unreadable.
 12. **Animation** (`scripts/animate_string.py`). String motion over time from the finite-difference solver, in slow motion with the bridge force below, exported as MP4 or GIF; plus a one-period filmstrip and a check against the modal model.
-13. **The app** (`scripts/app.py`, window in `viz/app.py`). One Tk window with tabs: Explorer (item 8), Compare (item 2, spectrograms, and mode decompositions, for any two positions), Animate (item 12, played live), and Tuner (§4.6). The Explorer and Tuner tabs are the matplotlib windows, embedded; Compare and Animate have Tk controls in a sidebar. A bar above the tabs opens an analyzed session and a guitar profile (`Workspace`, `load_workspace`); opening either rebuilds the tabs, and both are remembered between runs in `~/.config/spectrum-modeler/app.json`. Whatever fails to open is reported in the bar and forgotten. The app draws in the dark theme (`viz/style.py`: the same hues stepped for a dark surface); exports and the scripts use the light theme. Notes on Tk:
-    - Tk on macOS repaints the whole canvas on every change (about 9 per second at full size), so the animation blits only the moving artists and follows the clock: frames are skipped, but the slow-motion factor holds. It runs only while its tab is showing.
-    - TkAgg draws at 1× on Retina displays, so charts are softer than in a native matplotlib window. Qt (PySide6) would fix this and the repaint rate, at the cost of a large dependency.
+13. **The app** (`scripts/app.py`, window in `viz/app.py`). One Tk window with tabs: Explorer (item 8), Compare (item 2, spectrograms, and mode decompositions, for any two positions), and Tuner (§4.6). The Explorer and Tuner tabs are the matplotlib windows, embedded; Compare has Tk controls in a sidebar. A bar above the tabs opens an analyzed session and a guitar profile (`Workspace`, `load_workspace`); opening either rebuilds the tabs, and both are remembered between runs in `~/.config/spectrum-modeler/app.json`. Whatever fails to open is reported in the bar and forgotten. The app draws in the dark theme (`viz/style.py`: the same hues stepped for a dark surface); exports and the scripts use the light theme. Notes on Tk:
+    - TkAgg draws at 1× on Retina displays, so charts are softer than in a native matplotlib window. Qt (PySide6) would fix this, at the cost of a large dependency.
 
 ---
 

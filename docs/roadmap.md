@@ -113,7 +113,7 @@ All code (Stages 0–5) is built and tested before any recording is made. Until 
 - [x] Live spectrum, string shape, and centroid readout
 - [x] Play buttons for the model and for the nearest recording
 - [x] A/B playback with loudness normalization
-- [x] `scripts/app.py`: explorer, comparison, animation, and tuner as tabs in one dark-themed window
+- [x] `scripts/app.py`: explorer, comparison, and tuner as tabs in one dark-themed window
 - [x] README updated with usage instructions
 
 **Done when:**

@@ -69,7 +69,6 @@ def test_app_tabs(root, calibration_measurements, tmp_path, monkeypatch):
     assert f"{len(measurements)} takes" in app.session_text.get()
     assert app.compare.calibrated.get()
     assert app.notebook.index("end") == len(TABS)
-    assert not app.animate.visible  # opened on the explorer: the animation waits
 
     compare = app.compare
     assert len(compare.fig.axes) == 4  # shapes and spectra
@@ -94,25 +93,6 @@ def test_app_tabs(root, calibration_measurements, tmp_path, monkeypatch):
         "E2_ponticello_then_tasto.wav",
     }
 
-    animate = app.animate
-    animate.note.set("E4")
-    settle(root)
-    assert animate.player is not None and animate.player.frames.n_frames > 1
-    animate.view.set("check against modal model")
-    settle(root)
-    assert animate.player is None and len(animate.fig.axes) == 1
-    animate.damping.set(True)
-    settle(root)
-    assert "untick damping" in animate.status.get()
-    animate.damping.set(False)
-    animate.format.set("gif")
-    animate.periods.set(0.5)
-    written = animate.export(tmp_path / "animate")
-    assert {p.name for p in written} == {
-        "E4_ponticello_filmstrip.png",
-        "E4_ponticello_check.png",
-        "E4_ponticello.gif",
-    }
     assert style.current_theme().name == "dark"  # exports drew in light, then switched back
 
     answers = []
@@ -133,15 +113,9 @@ def test_app_tabs(root, calibration_measurements, tmp_path, monkeypatch):
 def test_without_a_profile_the_tuner_tab_explains(root):
     from spectrum_modeler.viz.app import App
 
-    app = App(root, config=None, tab="animate")
-    app.animate.toggle()  # paused, or update() never runs out of frames to show
+    app = App(root, config=None, tab="tune")
     settle(root)
     assert app.tuner is None
     assert app.session_text.get() == "no session"
-    assert app.animate.visible
     assert not app.compare.calibrated.get()
-
-    player = app.animate.player
-    player.advance(5 / 30)
-    assert player.frame == 5  # frames follow the clock, not the number of ticks
     app.close()

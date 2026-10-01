@@ -23,16 +23,15 @@ conda env update -f environment.yml --prune
 ## Quick start
 
 ```bash
-python scripts/app.py                     # the app: explorer, comparison, animation, tuner
+python scripts/app.py                     # the app: explorer, comparison, tuner
 python scripts/compare_positions.py       # batch: plots and WAVs, ponticello vs tasto, all six strings
 python scripts/animate_string.py          # batch: slow-motion animation of the string itself
 ```
 
-**The app** is one dark-themed window with four tabs:
+**The app** is one dark-themed window with three tabs:
 
 - **Explorer:** drag the pluck point, and watch and hear the overtones change.
 - **Compare:** two pluck positions side by side (spectra, spectrograms, or mode decompositions). **Export…** writes what `compare_positions.py` writes, for one string.
-- **Animate:** the simulated string in slow motion, a one-period filmstrip, or the check against the modal model. **Export…** writes what `animate_string.py` writes.
 - **Tuner:** adjust a guitar profile against measured takes (needs a session and a profile).
 
 **Open session…** and **Open profile…** (top of the window) load an analyzed session (for example `recordings/`) and a guitar profile (for example `calibration/my_guitar.json`); × closes either. The app reopens them next time (remembered in `~/.config/spectrum-modeler/app.json`). Exported files use the light theme.
