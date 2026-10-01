@@ -98,7 +98,7 @@ All code (Stages 0–5) is built and tested before any recording is made. Until 
 - [x] `ModelOptions(profile=...)` switches on the calibrated layers in `modal` and `synthesis`
 - [x] `viz/calibration.py`: $H(f)$ plot, per-take errors, β check
 - [x] `viz/tuner.py`: sliders, per-harmonic offsets, A/B playback, save
-- [x] `scripts/calibrate.py` and `scripts/tune.py`
+- [x] `scripts/calibrate.py`
 
 **Done when:**
 - [x] **Round-trip test:** a synthetic session with a known $H(f)$ → the fit recovers $H$, $w$, and the decay parameters within tolerance
@@ -113,7 +113,7 @@ All code (Stages 0–5) is built and tested before any recording is made. Until 
 - [x] Live spectrum, string shape, and centroid readout
 - [x] Play buttons for the model and for the nearest recording
 - [x] A/B playback with loudness normalization
-- [x] `scripts/explore.py`
+- [x] `scripts/app.py`: explorer, comparison, animation, and tuner as tabs in one dark-themed window
 - [x] README updated with usage instructions
 
 **Done when:**

@@ -315,7 +315,7 @@ $H$ depends on frequency but not on pluck position. Because each string is recor
 
 ### 4.6 Manual adjustment
 
-The **tuner** (`scripts/tune.py`, logic in `tuning.py`, window in `viz/tuner.py`) shows one take at a time: measured onset levels as bars, the calibrated model as markers, and the RMS error. It provides:
+The **tuner** (Tuner tab of `scripts/app.py`, logic in `tuning.py`, window in `viz/tuner.py`) shows one take at a time: measured onset levels as bars, the calibrated model as markers, and the RMS error. It provides:
 
 - sliders for finger width, $\sigma_0$, $\sigma_2$, and $B$, for the current string (width for the current finger type);
 - a per-harmonic offset in dB (choose the harmonic, then set the offset), plus **Match harmonic**, which sets the offset that closes the gap for the selected harmonic;
@@ -399,15 +399,16 @@ SpectrumModeler/
 │       ├── calibration.py   # H(f) plot, fit residuals, beta check
 │       ├── tuner.py         # manual adjustment window (§4.6)
 │       ├── explorer.py      # explorer window (§6)
-│       └── animate.py       # string animation, filmstrip, modal check (§2.4)
+│       ├── animate.py       # string animation, filmstrip, modal check (§2.4)
+│       ├── app.py           # the tabbed app window (§6)
+│       └── style.py         # light and dark themes, matplotlib settings
 ├── scripts/
 │   ├── compare_positions.py # A/B plots and WAVs for two pluck positions
 │   ├── make_synthetic_session.py # fake session for testing the pipeline
 │   ├── import_recordings.py # decode, check manifest, segment
 │   ├── analyze.py           # measure a session, or any single file (ad-hoc); plot
 │   ├── calibrate.py         # fit profile from measurements
-│   ├── tune.py              # launch tuner app
-│   ├── explore.py           # launch explorer app
+│   ├── app.py               # launch the app: explorer, compare, animate, tuner
 │   ├── new_manifest.py      # write a session's manifest before recording
 │   ├── animate_string.py    # simulate and animate the string (§2.4)
 │   └── compare_recordings.py # two recordings: spectrograms, difference, harmonics (§6)
@@ -505,9 +506,9 @@ Design principle: the computational code (`modal`, `synthesis`, `measure`, `cali
 5. **Model against recording.** Measured harmonic levels (bars) overlaid with the uncalibrated model (markers); the tuner shows the calibrated model the same way.
 6. **Spectrogram.** Of a recording or of synthesized audio, showing high harmonics decaying faster.
 7. **Calibration report.** The fitted $H(f)$ curve, the per-take errors, and the fitted β against the taped position.
-8. **Explorer app** (`scripts/explore.py`). String and finger selectors, a pluck-position slider, realism-layer checkboxes, a calibrated/uncalibrated switch, and a readout of β, the spectral centroid, missing harmonics, and the nearest recording. **Pin as B** freezes the current settings and overlays them on the spectrum. **Play model**, **Play recording**, and **Play A then B** (matched in loudness) are the playback buttons. Artists are updated in place: about 1 ms per change plus a ~110 ms redraw.
+8. **Explorer** (a tab of the app, item 13). String and finger selectors, a pluck-position slider, realism-layer checkboxes, a calibrated/uncalibrated switch, and a readout of β, the spectral centroid, missing harmonics, and the nearest recording. **Pin as B** freezes the current settings and overlays them on the spectrum. **Play model**, **Play recording**, and **Play A then B** (matched in loudness) are the playback buttons. Artists are updated in place: about 1 ms per change plus the redraw.
 9. **Brightness against position.** The spectral centroid (÷ $f_0$) against pluck distance, one line per finger type. In the uncalibrated model it is the same for every open string.
-10. **Tuner app.** See §4.6.
+10. **Tuner** (a tab of the app, item 13). See §4.6.
 11. **Recording comparison** (`scripts/compare_recordings.py`, logic in `compare.py`). Two recordings, each starting at a chosen pluck and running to the next, trimmed to the same length and matched in loudness (RMS). The panels:
     - both spectrograms on one dB scale;
     - a **difference map**, B − A in dB on a diverging scale (A's blue through neutral grey to B's orange, ±20 dB). It is blanked where neither recording is 15 dB above its *own* noise floor, because loudness matching raises the quieter recording's noise;
@@ -516,6 +517,9 @@ Design principle: the computational code (`modal`, `synthesis`, `measure`, `cali
 
     A literal overlay of two spectrograms is not used: blended colour maps make both unreadable.
 12. **Animation** (`scripts/animate_string.py`). String motion over time from the finite-difference solver, in slow motion with the bridge force below, exported as MP4 or GIF; plus a one-period filmstrip and a check against the modal model.
+13. **The app** (`scripts/app.py`, window in `viz/app.py`). One Tk window with tabs: Explorer (item 8), Compare (item 2, spectrograms, and mode decompositions, for any two positions), Animate (item 12, played live), and Tuner (§4.6). The Explorer and Tuner tabs are the matplotlib windows, embedded; Compare and Animate have Tk controls in a sidebar. A bar above the tabs opens an analyzed session and a guitar profile (`Workspace`, `load_workspace`); opening either rebuilds the tabs, and both are remembered between runs in `~/.config/spectrum-modeler/app.json`. Whatever fails to open is reported in the bar and forgotten. The app draws in the dark theme (`viz/style.py`: the same hues stepped for a dark surface); exports and the scripts use the light theme. Notes on Tk:
+    - Tk on macOS repaints the whole canvas on every change (about 9 per second at full size), so the animation blits only the moving artists and follows the clock: frames are skipped, but the slow-motion factor holds. It runs only while its tab is showing.
+    - TkAgg draws at 1× on Retina displays, so charts are softer than in a native matplotlib window. Qt (PySide6) would fix this and the repaint rate, at the cost of a large dependency.
 
 ---
 

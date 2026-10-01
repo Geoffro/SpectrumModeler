@@ -6,27 +6,29 @@ shifts the view, to see how the model responds; it is not saved.
 """
 
 import numpy as np
+from matplotlib.figure import Figure
 from matplotlib.widgets import Button, Slider
 
 from ..tuning import TunerState
-from .style import INK_SECONDARY, MUTED, SERIES, SURFACE, use_style
+from .style import C, button_props, slider_props, use_style
 
 FLOOR_DB = -60.0
 
 
 class TunerApp:
-    def __init__(self, state: TunerState) -> None:
+    def __init__(self, state: TunerState, fig: Figure | None = None) -> None:
+        """Draw in ``fig`` (already attached to a canvas), or in a new pyplot window."""
         import matplotlib.pyplot as plt
 
         use_style()  # the window is drawn later, outside any temporary style
         self.state = state
         self._syncing = False
-        self.fig = plt.figure(figsize=(13, 8.5))
+        self.fig = fig if fig is not None else plt.figure(figsize=(13, 8.5))
         self.ax = self.fig.add_axes((0.06, 0.45, 0.9, 0.47))
 
         def slider(row: int, label: str, lo: float, hi: float, **kw) -> Slider:
             ax = self.fig.add_axes((0.2, 0.33 - row * 0.045, 0.4, 0.03))
-            widget = Slider(ax, label, lo, hi, color=SERIES[0], **kw)
+            widget = Slider(ax, label, lo, hi, **slider_props(), **kw)
             widget.label.set_x(-0.03)  # clear of the track
             return widget
 
@@ -58,11 +60,11 @@ class TunerApp:
         ]
         for i, (label, action) in enumerate(actions):
             ax = self.fig.add_axes((0.68 + (i % 2) * 0.15, 0.30 - (i // 2) * 0.06, 0.13, 0.045))
-            button = Button(ax, label, color=SURFACE, hovercolor="#e1e0d9")
+            button = Button(ax, label, **button_props(ax))
             button.on_clicked(lambda _event, action=action: action())
             self.buttons[label] = button
 
-        self.status = self.fig.text(0.06, 0.015, "", color=INK_SECONDARY, fontsize=9)
+        self.status = self.fig.text(0.06, 0.015, "", color=C.INK_SECONDARY, fontsize=9)
         self._sync_sliders()
         self.redraw()
 
@@ -143,14 +145,14 @@ class TunerApp:
         ax.clear()
         ax.bar(
             harmonics[reliable], measured[reliable] - ref - FLOOR_DB, bottom=FLOOR_DB,
-            width=0.6, color=SERIES[0], linewidth=0, label="measured", zorder=3,
+            width=0.6, color=C.SERIES[0], linewidth=0, label="measured", zorder=3,
         )  # fmt: skip
         ax.plot(
             harmonics, np.maximum(model - ref, FLOOR_DB), "o", markersize=6,
-            color=SERIES[1], mec=SURFACE, mew=1, label="calibrated model", zorder=4,
+            color=C.SERIES[1], mec=C.SURFACE, mew=1, label="calibrated model", zorder=4,
         )  # fmt: skip
         selected = int(self.harmonic.val)
-        ax.axvline(selected, color=MUTED, linewidth=1, zorder=2)
+        ax.axvline(selected, color=C.MUTED, linewidth=1, zorder=2)
         ax.set_xlim(0.3, harmonics[-1] + 0.7)
         ax.set_ylim(FLOOR_DB, 5)
         ax.set_xlabel("Harmonic number")

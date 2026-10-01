@@ -6,17 +6,12 @@ same pair as a diverging scale with a neutral grey midpoint.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
 
 from ..compare import FLOOR_DB, Comparison, harmonic_track
 from .spectrogram import plot_spectrogram
-from .style import GRID, MUTED, SERIES, SURFACE, styled
+from .style import C, styled
 
-# Blue (A stronger) through neutral grey to orange (B stronger).
-DIFFERENCE_CMAP = LinearSegmentedColormap.from_list(
-    "a_vs_b", ["#184f95", "#5598e7", "#f0efec", "#f19a73", "#b8481c"]
-)
 DIFFERENCE_RANGE_DB = 20.0
 
 
@@ -56,13 +51,13 @@ def plot_comparison(
         a.spectrogram.times,
         a.spectrogram.freqs[keep],
         comparison.difference_db()[keep],
-        cmap=DIFFERENCE_CMAP,
+        cmap=C.DIFFERENCE_CMAP,
         vmin=-DIFFERENCE_RANGE_DB,
         vmax=DIFFERENCE_RANGE_DB,
         shading="nearest",
         rasterized=True,
     )
-    ax.set_facecolor(SURFACE)
+    ax.set_facecolor(C.SURFACE)
     ax.grid(False)
     ax.set_xlabel("Time after the pluck (s)")
     ax.set_ylabel("Frequency (Hz)")
@@ -75,7 +70,7 @@ def plot_comparison(
     measured = [r.measurement for r in (a, b) if r.measurement is not None]
     if measured:
         top = max(np.nanmax(m.initial_db) for m in measured)
-        for rec, color, style in ((a, SERIES[0], "bar"), (b, SERIES[1], "dot")):
+        for rec, color, style in ((a, C.SERIES[0], "bar"), (b, C.SERIES[1], "dot")):
             m = rec.measurement
             if m is None:
                 continue
@@ -85,7 +80,7 @@ def plot_comparison(
                 ax.bar(m.harmonics[ok], levels + 60, bottom=-60, width=0.6, color=color,
                        linewidth=0, label=f"A: {rec.name}", zorder=3)  # fmt: skip
             else:
-                ax.plot(m.harmonics[ok], levels, "o", markersize=6, color=color, mec=SURFACE,
+                ax.plot(m.harmonics[ok], levels, "o", markersize=6, color=color, mec=C.SURFACE,
                         mew=1, label=f"B: {rec.name}", zorder=4)  # fmt: skip
         ax.set_xlim(0.3, level_harmonics + 0.7)
         ax.set_ylim(-60, 5)
@@ -100,7 +95,7 @@ def plot_comparison(
     times = a.spectrogram.times
     for key, harmonic in zip(("k1", "k2", "k3", "k4"), harmonics, strict=False):
         ax = axes[key]
-        for rec, color in ((a, SERIES[0]), (b, SERIES[1])):
+        for rec, color in ((a, C.SERIES[0]), (b, C.SERIES[1])):
             track = harmonic_track(comparison, rec, harmonic)
             if track is not None:
                 ax.plot(times, track, color=color, linewidth=1.5)
@@ -135,7 +130,7 @@ def _note_problems(ax, comparison: Comparison) -> None:
             "\n".join(problems),
             transform=ax.transAxes,
             fontsize=8,
-            color=MUTED,
+            color=C.MUTED,
             va="bottom",
-            bbox={"facecolor": SURFACE, "edgecolor": GRID},
+            bbox={"facecolor": C.SURFACE, "edgecolor": C.GRID},
         )

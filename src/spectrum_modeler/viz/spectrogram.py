@@ -5,7 +5,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from ..analysis import Spectrogram
-from .style import LEVEL_CMAP, styled
+from .style import C, figure, styled
 
 
 @styled
@@ -27,7 +27,7 @@ def plot_spectrogram(
         spec.times,
         spec.freqs[keep],
         spec.db(ref=ref, floor_db=floor_db)[keep],
-        cmap=LEVEL_CMAP,
+        cmap=C.LEVEL_CMAP,
         vmin=floor_db,
         vmax=0,
         shading="nearest",
@@ -51,10 +51,12 @@ def plot_spectrogram_pair(
     suptitle: str = "",
     floor_db: float = -80.0,
     max_freq: float = 5000.0,
+    fig: Figure | None = None,
 ) -> Figure:
     """Two spectrograms side by side on one dB scale."""
     ref = max(a.magnitude.max(), b.magnitude.max())
-    fig, (left, right) = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True, layout="constrained")
+    fig = figure(fig, (13, 4.5))
+    left, right = fig.subplots(1, 2, sharey=True)
     plot_spectrogram(
         a, left, ref=ref, floor_db=floor_db, max_freq=max_freq, title=labels[0], colorbar=False
     )

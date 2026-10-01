@@ -19,7 +19,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from spectrum_modeler.fdtd import simulate
 from spectrum_modeler.modal import coefficients
 from spectrum_modeler.params import ModelOptions
 from spectrum_modeler.presets import (
@@ -34,9 +33,8 @@ from spectrum_modeler.viz.animate import (
     plot_filmstrip,
     plot_modal_check,
     save_animation,
+    simulate_for_animation,
 )
-
-CHECK_DURATION = 0.5  # s simulated for the harmonic check
 
 
 def position(value: str) -> str | float:
@@ -68,13 +66,9 @@ def main() -> None:
     for pos in args.positions:
         p = pluck(pos, finger=args.finger)
         stem = f"{string.note}_{pos if isinstance(pos, str) else f'{pos:g}mm'}"
-        span = args.periods / string.f0
-        frames = span * args.slowdown * args.fps
-        result = simulate(
-            string, p, max(span, CHECK_DURATION),
+        result = simulate_for_animation(
+            string, p, periods=args.periods, slowdown=args.slowdown, fps=args.fps,
             damping=args.damping,
-            snapshot_every=max(1, round(span * 48_000 / frames / 2)),
-            snapshot_until=span,
         )  # fmt: skip
 
         modal = coefficients(string, p, ModelOptions(n_harmonics=20, damping=False))

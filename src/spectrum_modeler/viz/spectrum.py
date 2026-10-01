@@ -10,7 +10,7 @@ from ..modal import ModalSpectrum, coefficients, envelope_nulls
 from ..params import ModelOptions, StringParams
 from ..presets import pluck
 from .shape import plot_initial_shape
-from .style import MUTED, SERIES, styled
+from .style import C, figure, styled
 
 OBSERVABLE_LABELS = {
     "displacement": "string displacement",
@@ -26,7 +26,7 @@ def node_markers(ax: Axes, nulls: np.ndarray):
         np.full(nulls.size, 0.985),
         "v",
         markersize=5,
-        color=MUTED,
+        color=C.MUTED,
         transform=ax.get_xaxis_transform(),
         clip_on=False,
         zorder=4,
@@ -52,7 +52,7 @@ def plot_spectrum(
     *,
     ref: float | None = None,
     floor_db: float = -60.0,
-    color: str = SERIES[0],
+    color: str | None = None,
     title: str | None = None,
 ) -> Axes:
     """Harmonic levels in dB, with markers where the pluck point is a node.
@@ -65,6 +65,7 @@ def plot_spectrum(
     n = spectrum.harmonics
     levels = spectrum.levels_db(ref=ref, floor_db=floor_db)
 
+    color = color or C.SERIES[0]
     ax.bar(n, levels - floor_db, bottom=floor_db, width=0.6, color=color, linewidth=0, zorder=3)
 
     nulls = envelope_nulls(spectrum.beta, n[-1] + 0.5)
@@ -89,15 +90,15 @@ def plot_comparison(
     *,
     labels: tuple[str, str] | None = None,
     floor_db: float = -60.0,
+    fig: Figure | None = None,
 ) -> Figure:
     """Two plucks side by side: string shape on top, spectrum below, on one dB scale."""
     labels = labels or (describe(a), describe(b))
     ref = max(np.abs(a.amps).max(), np.abs(b.amps).max())
 
-    fig, axes = plt.subplots(
-        2, 2, figsize=(13, 6.5), height_ratios=[1, 1.7], sharey="row", layout="constrained"
-    )
-    for col, (spectrum, label, color) in enumerate(zip((a, b), labels, SERIES, strict=False)):
+    fig = figure(fig, (13, 6.5))
+    axes = fig.subplots(2, 2, height_ratios=[1, 1.7], sharey="row")
+    for col, (spectrum, label, color) in enumerate(zip((a, b), labels, C.SERIES, strict=False)):
         plot_initial_shape(
             spectrum.string, spectrum.pluck, ax=axes[0, col], color=color, title=label
         )
@@ -134,7 +135,7 @@ def plot_brightness_vs_position(
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 4.5), layout="constrained")
     positions_mm = np.asarray(positions_mm, dtype=float)
-    for finger, color in zip(fingers, SERIES, strict=False):
+    for finger, color in zip(fingers, C.SERIES, strict=False):
         centroids = []
         for mm in positions_mm:
             spectrum = coefficients(string, pluck(mm, length=string.length, finger=finger), opts)

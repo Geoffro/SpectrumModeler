@@ -23,14 +23,23 @@ conda env update -f environment.yml --prune
 ## Quick start
 
 ```bash
-python scripts/explore.py                 # interactive: drag the pluck point, hear the result
-python scripts/compare_positions.py       # plots and WAVs, ponticello vs tasto, all six strings
-python scripts/animate_string.py          # slow-motion animation of the string itself
+python scripts/app.py                     # the app: explorer, comparison, animation, tuner
+python scripts/compare_positions.py       # batch: plots and WAVs, ponticello vs tasto, all six strings
+python scripts/animate_string.py          # batch: slow-motion animation of the string itself
 ```
+
+**The app** is one dark-themed window with four tabs:
+
+- **Explorer:** drag the pluck point, and watch and hear the overtones change.
+- **Compare:** two pluck positions side by side (spectra, spectrograms, or mode decompositions). **Export…** writes what `compare_positions.py` writes, for one string.
+- **Animate:** the simulated string in slow motion, a one-period filmstrip, or the check against the modal model. **Export…** writes what `animate_string.py` writes.
+- **Tuner:** adjust a guitar profile against measured takes (needs a session and a profile).
+
+**Open session…** and **Open profile…** (top of the window) load an analyzed session (for example `recordings/`) and a guitar profile (for example `calibration/my_guitar.json`); × closes either. The app reopens them next time (remembered in `~/.config/spectrum-modeler/app.json`). Exported files use the light theme.
 
 `compare_positions.py` writes to `output/`: spectra, spectrograms, one WAV per pluck, and an A-then-B WAV matched in loudness. Options: `--string E2`, `--a 40 --b twelfth_fret` (preset or mm), `--finger nail`, `--no-damping`, `--body`, `--inharmonicity 5e-5`, `--profile my_guitar`, `--detail` (mode decompositions).
 
-**Explorer** controls: string, finger, realism layers, calibrated/uncalibrated, and the pluck-position slider. **Pin as B** freezes the current settings for comparison. **Play A then B** plays both, matched in loudness. **Play recording** plays the recorded take nearest the current position (needs `--session`).
+**Explorer** controls: string, finger, realism layers, calibrated/uncalibrated, and the pluck-position slider. **Pin as B** freezes the current settings for comparison. **Play A then B** plays both, matched in loudness. **Play recording** plays the recorded take nearest the current position (needs a session).
 
 ## Calibrating to your guitar
 
@@ -47,14 +56,7 @@ python scripts/animate_string.py          # slow-motion animation of the string 
    ```bash
    python scripts/calibrate.py --session recordings --name my_guitar
    ```
-5. **Fine-tune** by hand (optional). Adjustments are kept when you recalibrate.
-   ```bash
-   python scripts/tune.py --session recordings --profile my_guitar
-   ```
-6. **Explore** with the calibrated model:
-   ```bash
-   python scripts/explore.py --profile my_guitar --session recordings
-   ```
+5. **Fine-tune** by hand in the Tuner tab (optional; adjustments are kept when you recalibrate), and **explore** the calibrated model: run `python scripts/app.py`, then open `recordings` and `calibration/my_guitar.json`.
 
 **No recordings yet?** Run the same pipeline on a synthetic session with known answers:
 

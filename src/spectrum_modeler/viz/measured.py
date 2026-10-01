@@ -8,7 +8,7 @@ from ..analysis import spectrogram
 from ..measure import Measurement, align_model_db, window_spectrum
 from ..modal import ModalSpectrum
 from .spectrogram import plot_spectrogram
-from .style import INK_SECONDARY, MUTED, SERIES, SURFACE, styled
+from .style import C, styled
 
 
 def describe(m: Measurement) -> str:
@@ -45,19 +45,19 @@ def plot_measurement(
 
     # Spectrum with detected harmonics
     keep = ws.freqs <= top
-    spec_ax.plot(ws.freqs[keep], ws.db[keep], color=SERIES[0], linewidth=1, label="spectrum")
-    spec_ax.plot(m.freqs, m.floor_db, color=MUTED, linewidth=1, label="local noise floor")
+    spec_ax.plot(ws.freqs[keep], ws.db[keep], color=C.SERIES[0], linewidth=1, label="spectrum")
+    spec_ax.plot(m.freqs, m.floor_db, color=C.MUTED, linewidth=1, label="local noise floor")
     spec_ax.plot(
         m.freqs[rel], m.window_db[rel], "o", markersize=6,
-        color=SERIES[0], mec=SURFACE, mew=1.5, label="harmonic",
+        color=C.SERIES[0], mec=C.SURFACE, mew=1.5, label="harmonic",
     )  # fmt: skip
     spec_ax.plot(
         m.freqs[~rel], m.window_db[~rel], "o", markersize=6,
-        mfc="none", mec=MUTED, label="harmonic not found",
+        mfc="none", mec=C.MUTED, label="harmonic not found",
     )  # fmt: skip
     for i, f in enumerate(m.off_series_hz):
         spec_ax.axvline(
-            f, color=SERIES[1], linewidth=1.2, label="off-series peak" if i == 0 else None
+            f, color=C.SERIES[1], linewidth=1.2, label="off-series peak" if i == 0 else None
         )
     visible = ws.db[keep]
     spec_ax.set_ylim(np.percentile(visible, 1) - 5, visible.max() + 5)
@@ -78,7 +78,7 @@ def plot_measurement(
         measured[rel] - floor_db,
         bottom=floor_db,
         width=0.6,
-        color=SERIES[0],
+        color=C.SERIES[0],
         linewidth=0,
         label="measured",
         zorder=3,
@@ -87,7 +87,7 @@ def plot_measurement(
         aligned = align_model_db(m, model) - ref
         level_ax.plot(
             m.harmonics, np.maximum(aligned, floor_db), "o", markersize=5,
-            color=SERIES[1], mec=SURFACE, mew=1, label="model (uncalibrated)", zorder=4,
+            color=C.SERIES[1], mec=C.SURFACE, mew=1, label="model (uncalibrated)", zorder=4,
         )  # fmt: skip
     level_ax.set_ylim(floor_db, 5)
     level_ax.set_xlim(0.3, m.harmonics[-1] + 0.7)
@@ -99,7 +99,8 @@ def plot_measurement(
     else:
         level_ax.text(
             1, 1.02, "no model: note or pluck position unknown",
-            transform=level_ax.transAxes, ha="right", va="bottom", color=INK_SECONDARY, fontsize=8,
+            transform=level_ax.transAxes, ha="right", va="bottom", color=C.INK_SECONDARY,
+            fontsize=8,
         )  # fmt: skip
 
     # Decay over time
