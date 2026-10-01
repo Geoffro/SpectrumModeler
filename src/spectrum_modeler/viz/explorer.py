@@ -13,6 +13,7 @@ from .spectrum import describe, node_markers
 from .style import C, button_props, check_props, radio_props, slider_props, use_style
 
 FLOOR_DB = -60.0
+QUARTERS = ((0.25, "L/4"), (0.5, "L/2"), (0.75, "3L/4"))
 
 LAYERS = {"damping": "damping", "finger width": "finger_width",
           "stiffness": "inharmonicity", "body": "body"}  # fmt: skip
@@ -71,6 +72,15 @@ class ExplorerApp:
             **slider_props(),
         )
         self.position.label.set_x(-0.03)
+        ax = self.position.ax
+        for fraction, label in QUARTERS:
+            x = fraction * state.length * 1000
+            ax.plot(x, 0, "|", markersize=6, color=C.MUTED, transform=ax.get_xaxis_transform(),
+                    clip_on=False)  # fmt: skip
+            ax.annotate(
+                label, (x, 0), xycoords=ax.get_xaxis_transform(), xytext=(0, -6),
+                textcoords="offset points", ha="center", va="top", color=C.MUTED, fontsize=8,
+            )  # fmt: skip
 
         self.strings.on_clicked(lambda note: self._change(note=note))
         self.fingers.on_clicked(lambda finger: self._change(finger=finger))
@@ -159,7 +169,7 @@ class ExplorerApp:
         self.pluck_label = ax.annotate(
             "", (0, 0), xytext=(8, 4), textcoords="offset points", color=C.INK_SECONDARY, fontsize=9
         )
-        frame_string_axes(ax, spectrum.string, spectrum.pluck)
+        frame_string_axes(ax, spectrum.string, spectrum.pluck, end_labels=False)
 
         ax = self.spectrum_ax
         n = np.arange(1, DISPLAY_HARMONICS + 1)

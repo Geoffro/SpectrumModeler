@@ -16,14 +16,18 @@ def _grid(string: StringParams, pluck: PluckParams, points: int = 801) -> np.nda
     return np.union1d(np.linspace(0, string.length, points), [xp])
 
 
-def frame_string_axes(ax: Axes, string: StringParams, pluck: PluckParams) -> None:
-    """Axes limits, labels, baseline, and saddle/nut marks for a string-shape plot."""
+def frame_string_axes(
+    ax: Axes, string: StringParams, pluck: PluckParams, *, end_labels: bool = True
+) -> None:
+    """Axes limits, labels, baseline, and (optionally) saddle/nut marks for a string-shape plot."""
     h_mm = pluck.amplitude * 1000
     ax.axhline(0, color=C.BASELINE, linewidth=1, zorder=1)
     ax.set_xlim(0, string.length * 1000)
     ax.set_ylim(-0.3 * h_mm, 1.3 * h_mm)
     ax.set_xlabel("Distance from saddle (mm)")
     ax.set_ylabel("Displacement (mm)")
+    if not end_labels:
+        return
     for x, label, ha in ((0, "saddle", "left"), (string.length * 1000, "nut", "right")):
         ax.annotate(
             label,

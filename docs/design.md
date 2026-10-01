@@ -51,12 +51,14 @@ The string has length $L$, tension $T$, and linear density $\mu$. Waves travel a
 The finger pulls the string to a height $h$ at distance $x_p = \beta L$ from the bridge, where $0 < \beta < 1$, and releases it from rest. The starting shape is a triangle. Solving the wave equation with fixed ends gives:
 
 $$
-y(x,t) = \sum_{n=1}^{\infty} b_n \sin\!\left(\frac{n\pi x}{L}\right)\cos(2\pi n f_0 t)
+y(x,t) = \sum_{n=1}^{\infty} a_n \sin\!\left(\frac{n\pi x}{L}\right)\cos(2\pi n f_0 t)
 $$
 
 $$
-b_n = \frac{2h}{n^2\pi^2\,\beta(1-\beta)}\,\sin(n\pi\beta)
+a_n = \frac{2h}{n^2\pi^2\,\beta(1-\beta)}\,\sin(n\pi\beta)
 $$
+
+Source: E. M. Stein and R. Shakarchi, *Fourier Analysis: An Introduction* (Princeton, 2003), from "Example: the plucked string"
 
 **Main consequences:**
 
@@ -72,14 +74,14 @@ $$
 The soundboard is driven by the force the string puts on the bridge. That force is proportional to the string's slope at $x = 0$:
 
 $$
-F(t) = T\,\frac{\partial y}{\partial x}\Big|_{x=0} = \sum_n \underbrace{T\,b_n\,\frac{n\pi}{L}}_{F_n}\cos(2\pi n f_0 t),
+F(t) = T\,\frac{\partial y}{\partial x}\Big|_{x=0} = \sum_n \underbrace{T\,a_n\,\frac{n\pi}{L}}_{F_n}\cos(2\pi n f_0 t),
 \qquad F_n \propto \frac{\sin(n\pi\beta)}{n}
 $$
 
 So the bridge force falls off as **1/n**, not $1/n^2$. It is the more relevant spectrum for the perceived sound. The model offers three **observables**:
 
-- `displacement` — the $b_n$ values (the string's shape)
-- `velocity` — $2\pi f_n b_n$, the modal velocity
+- `displacement` — the $a_n$ values (the string's shape)
+- `velocity` — $2\pi f_n a_n$, the modal velocity
 - `bridge_force` — $F_n$ above (the default for audio and for calibration)
 
 ### 2.3 Realism layers
@@ -377,7 +379,7 @@ SpectrumModeler/
 │   ├── string_sets.py       # load string sets; lbf -> N
 │   ├── params.py            # dataclasses: StringParams, PluckParams, ModelOptions
 │   ├── presets.py           # open strings, pluck positions, finger types
-│   ├── modal.py             # b_n, observables, damping, width, inharmonicity
+│   ├── modal.py             # a_n, observables, damping, width, inharmonicity
 │   ├── synthesis.py         # additive synthesis -> numpy audio buffer
 │   ├── body.py              # illustrative body resonances (uncalibrated fallback)
 │   ├── synthetic.py         # generate fake sessions with known parameters
@@ -542,10 +544,10 @@ Dependencies are in `environment.yml` (conda-forge, including ffmpeg for decodin
 
 | Test | Verifies |
 |---|---|
-| Sum of $b_n \sin(n\pi x/L)$ for N = 2000 reconstructs the triangle (max error below 0.5 % of h) | Coefficient formula |
-| $b_n$ matches a numerical sine transform of `initial_shape` | Formula against an independent method |
-| $b_n \approx 0$ for every $n$ with $n\beta$ a whole number | Missing-harmonic logic |
-| $b_n(\beta) = (-1)^{n+1} b_n(1-\beta)$ | Mirror symmetry of the string |
+| Sum of $a_n \sin(n\pi x/L)$ for N = 2000 reconstructs the triangle (max error below 0.5 % of h) | Coefficient formula |
+| $a_n$ matches a numerical sine transform of `initial_shape` | Formula against an independent method |
+| $a_n \approx 0$ for every $n$ with $n\beta$ a whole number | Missing-harmonic logic |
+| $a_n(\beta) = (-1)^{n+1} a_n(1-\beta)$ | Mirror symmetry of the string |
 | Bridge-force spectrum decays as ~1/n on average; displacement as ~1/n² | Observables |
 | Rendered audio peaks at 1.0 and is finite; decay envelope matches $\sigma_n$ | Synthesis |
 | **Round trip:** synthesize a note with known β, $w$, $\sigma_0$, $\sigma_2$, and $B$, add noise, then measure it. The recovered values match the inputs within tolerance | `measure.py` |

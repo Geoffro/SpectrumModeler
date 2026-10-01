@@ -4,7 +4,7 @@ The string is fixed at x = 0 (saddle) and x = L (nut), pulled to height h at
 x_p = beta * L, and released from rest. Mode n has shape sin(n pi x / L),
 frequency n f0, and displacement amplitude
 
-    b_n = 2 h sin(n pi beta) / (n^2 pi^2 beta (1 - beta)).
+    a_n = 2 h sin(n pi beta) / (n^2 pi^2 beta (1 - beta)).
 
 Amplitudes are signed; take the magnitude for plotting.
 """
@@ -58,7 +58,7 @@ def _at_node(n: np.ndarray, beta: float) -> np.ndarray:
 
 
 def displacement_coefficients(n: np.ndarray, beta: float, amplitude: float) -> np.ndarray:
-    """b_n for harmonic numbers ``n``; exactly zero where the pluck is on a node."""
+    """a_n for harmonic numbers ``n``; exactly zero where the pluck is on a node."""
     if not 0 < beta < 1:
         raise ValueError(f"beta must be between 0 and 1, not {beta}")
     n = np.asarray(n, dtype=float)
@@ -83,9 +83,9 @@ def coefficients(
 ) -> ModalSpectrum:
     """Mode frequencies, amplitudes, and decay rates for the chosen observable.
 
-    - ``displacement``: b_n (m)
-    - ``velocity``: modal velocity amplitude 2 pi f_n b_n (m/s)
-    - ``bridge_force``: F_n = T b_n n pi / L (N); needs ``string.tension``
+    - ``displacement``: a_n (m)
+    - ``velocity``: modal velocity amplitude 2 pi f_n a_n (m/s)
+    - ``bridge_force``: F_n = T a_n n pi / L (N); needs ``string.tension``
 
     Realism layers switched on in ``opts`` are applied on top (design §2.3). With
     a guitar profile, its calibrated values replace the defaults: tuning, length,
@@ -183,7 +183,7 @@ def initial_shape(x: np.ndarray, length: float, pluck: PluckParams) -> np.ndarra
 def mode_contributions(
     x: np.ndarray, string: StringParams, pluck: PluckParams, n_modes: int
 ) -> np.ndarray:
-    """Each mode's displacement b_n sin(n pi x / L) at release; shape (n_modes, len(x))."""
+    """Each mode's displacement a_n sin(n pi x / L) at release; shape (n_modes, len(x))."""
     n = np.arange(1, n_modes + 1)
     b = displacement_coefficients(n, pluck.beta(string.length), pluck.amplitude)
     x = np.asarray(x, dtype=float)
