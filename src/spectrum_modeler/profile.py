@@ -95,16 +95,17 @@ class GuitarProfile:
             return manual.inharmonicity_b
         return self.strings[note].inharmonicity_b
 
-    def decay_rates(self, note: str, harmonics: np.ndarray, freqs: np.ndarray) -> np.ndarray:
-        """Per-harmonic decay rates: measured where available, else sigma0 + sigma2 f^2.
+    def uses_measured_decay(self, note: str) -> bool:
+        """Whether ``decay_rates`` uses the measured sigma_n: not if sigma0 or sigma2
+        was adjusted by hand, so the adjustment takes effect everywhere."""
+        manual = self.manual.get(note, StringManual())
+        return note in self.strings and manual.sigma0 is None and manual.sigma2 is None
 
-        If sigma0 or sigma2 has been adjusted by hand, the formula is used for
-        every harmonic, so the adjustment takes effect everywhere.
-        """
+    def decay_rates(self, note: str, harmonics: np.ndarray, freqs: np.ndarray) -> np.ndarray:
+        """Per-harmonic decay rates: measured where available, else sigma0 + sigma2 f^2."""
         sigma0, sigma2 = self.damping(note)
         rates = sigma0 + sigma2 * np.asarray(freqs, dtype=float) ** 2
-        manual = self.manual.get(note, StringManual())
-        if manual.sigma0 is None and manual.sigma2 is None:
+        if self.uses_measured_decay(note):
             measured = self.strings[note].sigma_n
             for i, n in enumerate(harmonics):
                 if n - 1 < len(measured) and measured[n - 1] is not None:

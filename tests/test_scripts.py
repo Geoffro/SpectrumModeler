@@ -104,6 +104,16 @@ def test_compare_positions(tmp_path, monkeypatch):
     }
 
 
+def test_compare_positions_damping_options(tmp_path, monkeypatch):
+    run("compare_positions.py", "--string", "E2", "--damping", "flat", "--sigma0", 0.5,
+        "--duration", 0.5, "--out", tmp_path, monkeypatch=monkeypatch)  # fmt: skip
+    run("compare_positions.py", "--string", "E2", "--no-damping", "--sigma2", 1e-6,
+        "--no-audio", "--out", tmp_path / "off", monkeypatch=monkeypatch)  # fmt: skip
+    assert (tmp_path / "E2_ponticello.wav").exists()
+    with pytest.raises(SystemExit):
+        run("compare_positions.py", "--damping", "heavy", monkeypatch=monkeypatch)
+
+
 def test_compare_recordings(tmp_path, monkeypatch, capsys):
     a = pluck_wav(tmp_path / "a.wav", position="tasto")
     b = pluck_wav(tmp_path / "b.wav", position="ponticello")

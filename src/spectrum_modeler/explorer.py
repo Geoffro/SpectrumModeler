@@ -15,7 +15,7 @@ from .analysis import spectral_centroid
 from .audio import match_loudness, sequence
 from .measure import Measurement, take_audio
 from .modal import ModalSpectrum, coefficients, missing_harmonics
-from .params import ModelOptions, StringParams
+from .params import DAMPING_MODES, Damping, ModelOptions, StringParams
 from .presets import DEFAULT_SCALE_LENGTH, OPEN_STRING_NOTES, open_strings, pluck
 from .profile import GuitarProfile
 from .recording import SAMPLE_RATE, Session
@@ -25,6 +25,7 @@ from .synthesis import render_spectrum
 DISPLAY_HARMONICS = 40
 AUDIO_MAX_FREQ = 12_000.0  # Hz, highest partial rendered for listening
 EDGE_MM = 10.0  # closest a pluck may be to the saddle or nut
+RING_HARMONICS = (1, 10, DISPLAY_HARMONICS)  # ring times shown in the readout
 
 
 @dataclass(frozen=True)
@@ -32,15 +33,34 @@ class Settings:
     note: str = "E2"
     position_mm: float = 130.0
     finger: str = "flesh"
-    damping: bool = True
+    damping: Damping = "full"
     finger_width: bool = True
     inharmonicity: bool = False
     body: bool = False
     calibrated: bool = False
+    # None: the string's own value (the profile's, when calibrated)
+    sigma0: float | None = None  # 1/s
+    sigma2: float | None = None  # 1/(s Hz^2)
+
+    def __post_init__(self) -> None:
+        if self.damping not in DAMPING_MODES:
+            raise ValueError(f"damping must be one of {DAMPING_MODES}, not {self.damping!r}")
+        for name in ("sigma0", "sigma2"):
+            value = getattr(self, name)
+            if value is not None and value < 0:
+                raise ValueError(f"{name} can't be negative")
 
     def describe(self) -> str:
         mode = "calibrated" if self.calibrated else "uncalibrated"
-        return f"{self.note}, {self.position_mm:g} mm, {self.finger}, {mode}"
+        text = f"{self.note}, {self.position_mm:g} mm, {self.finger}, {mode}"
+        if self.damping != "full":
+            text += ", no damping" if self.damping == "off" else ", flat damping"
+        if self.damping != "off":
+            if self.sigma0 is not None:
+                text += f", σ0 {self.sigma0:.2f}"
+            if self.sigma2 is not None and self.damping == "full":
+                text += f", σ2 {self.sigma2:.1e}"
+        return text
 
 
 class ExplorerState:
@@ -108,6 +128,8 @@ class ExplorerState:
             inharmonicity=s.inharmonicity and has_b,
             body=s.body,
             profile=profile,
+            sigma0=s.sigma0,
+            sigma2=s.sigma2,
         )
         return opts, has_b
 
@@ -119,6 +141,17 @@ class ExplorerState:
         return coefficients(
             self.strings[s.note], pluck(s.position_mm, length=self.length, finger=s.finger), opts
         )
+
+    def damping_values(self, settings: Settings | None = None) -> tuple[float, float]:
+        """The sigma0 and sigma2 in use: the overrides, else the string's (or profile's)."""
+        string = self.spectrum(settings, 1).string
+        return string.sigma0, string.sigma2
+
+    def ring_times(self, settings: Settings | None = None) -> dict[int, float]:
+        """Seconds for harmonics in ``RING_HARMONICS`` to fall 60 dB (inf: no decay)."""
+        spectrum = self.spectrum(settings)
+        with np.errstate(divide="ignore"):
+            return {n: float(np.log(1000) / spectrum.decay_rates[n - 1]) for n in RING_HARMONICS}
 
     def pinned_spectrum(self) -> ModalSpectrum | None:
         return self.spectrum(self.pinned) if self.pinned else None
@@ -146,6 +179,18 @@ class ExplorerState:
             "missing harmonics: "
             + (", ".join(map(str, missing)) if missing.size else f"none ≤ {DISPLAY_HARMONICS}"),
         ]
+        if s.damping == "off":
+            lines.append("ring time (−60 dB): forever (damping off)")
+        else:
+            times = " · ".join(
+                f"h{n} {t:.1f} s" if np.isfinite(t) else f"h{n} forever"
+                for n, t in self.ring_times().items()
+            )
+            measured = (
+                s.damping == "full" and s.calibrated and s.sigma0 is None and s.sigma2 is None
+                and self.profile.uses_measured_decay(s.note)
+            )  # fmt: skip
+            lines.append(f"ring time (−60 dB): {times}" + (" (measured)" if measured else ""))
         if self.pinned:
             lines.append(
                 f"B: {self.pinned.describe()}, centroid {self.centroid(self.pinned):.0f} Hz"

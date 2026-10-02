@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 
 Observable = Literal["displacement", "velocity", "bridge_force"]
 OBSERVABLES: tuple[Observable, ...] = ("displacement", "velocity", "bridge_force")
+# "full": sigma0 + sigma2 f^2; "flat": sigma0 only, so every partial decays
+# together; "off": no decay at all.
+Damping = Literal["full", "flat", "off"]
+DAMPING_MODES: tuple[Damping, ...] = ("full", "flat", "off")
 
 
 @dataclass(frozen=True)
@@ -77,16 +81,28 @@ class ModelOptions:
     observable: Observable = "bridge_force"
     # Realism layers (design §2.3). None means automatic: on when a guitar
     # profile supplies the values, otherwise off.
-    damping: bool = True
+    damping: Damping | bool = "full"  # True and False mean "full" and "off"
     finger_width: bool = True  # has no effect for an ideal (zero-width) pluck
     inharmonicity: bool | None = None  # needs the string's B
     body: bool | None = None  # calibrated response with a profile; else illustrative resonances
     # A guitar profile (name, path, or loaded profile) overrides f0, damping, B,
     # finger widths, and body response with calibrated values (design §4.7).
     profile: "str | Path | GuitarProfile | None" = None
+    # Replace the string's (or profile's) sigma0 and sigma2. With a profile, an
+    # override uses the formula for every harmonic instead of the measured rates.
+    sigma0: float | None = None  # 1/s
+    sigma2: float | None = None  # 1/(s Hz^2)
 
     def __post_init__(self) -> None:
         if self.n_harmonics < 1:
             raise ValueError("n_harmonics must be at least 1")
         if self.observable not in OBSERVABLES:
             raise ValueError(f"observable must be one of {OBSERVABLES}, not {self.observable!r}")
+        if isinstance(self.damping, bool):
+            object.__setattr__(self, "damping", "full" if self.damping else "off")
+        if self.damping not in DAMPING_MODES:
+            raise ValueError(f"damping must be one of {DAMPING_MODES}, not {self.damping!r}")
+        for name in ("sigma0", "sigma2"):
+            value = getattr(self, name)
+            if value is not None and value < 0:
+                raise ValueError(f"{name} can't be negative")

@@ -95,6 +95,22 @@ def test_app_tabs(root, calibration_measurements, tmp_path, monkeypatch):
 
     assert style.current_theme().name == "dark"  # exports drew in light, then switched back
 
+    compare.damping.set("flat")
+    compare.sigmas[0].set("0.5")
+    settle(root)
+    a, b = compare.settings()
+    assert (a.damping, a.sigma0, b.sigma0, a.sigma2) == ("flat", 0.5, 0.5, None)
+    compare.sigmas[1].set("lots")
+    compare.schedule(0)
+    settle(root)
+    assert "σ2" in compare.status.get()
+    compare.sigmas[1].set("-1")
+    compare.schedule(0)
+    settle(root)
+    assert "sigma2 can't be negative" in compare.status.get()
+    compare.sigmas[1].set("")
+    compare.damping.set("full")
+
     answers = []
     monkeypatch.setattr("tkinter.messagebox.askyesnocancel", lambda *a: answers.pop(0))
     app.tuner.sigma0.set_val(1.5)

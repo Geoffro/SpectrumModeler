@@ -24,6 +24,7 @@ from ..analysis import spectral_centroid, spectrogram
 from ..audio import match_loudness, sequence, write_wav
 from ..explorer import EDGE_MM, ExplorerState, Settings
 from ..measure import load_session_measurements
+from ..params import DAMPING_MODES
 from ..presets import FINGER_WIDTHS_MM, OPEN_STRING_NOTES, PLUCK_PRESETS, pluck_position_mm
 from ..profile import PROFILE_DIR, load_profile
 from ..recording import SAMPLE_RATE, Session
@@ -158,12 +159,32 @@ class Sidebar(ttk.Frame):
             box.bind(event, lambda _event: self.on_change())
         return var
 
-    def radios(self, label: str, options, value: str) -> tk.StringVar:
+    def radios(self, label: str, options, value: str, *, inline: bool = False) -> tk.StringVar:
         self.heading(label)
         var = tk.StringVar(value=value)
+        frame = ttk.Frame(self)
+        frame.pack(anchor="w")
         for option in options:
-            ttk.Radiobutton(self, text=option, value=option, variable=var).pack(anchor="w")
+            ttk.Radiobutton(frame, text=option, value=option, variable=var).pack(
+                side="left" if inline else "top", anchor="w", padx=(0, 8) if inline else 0
+            )
         return self._watch(var)
+
+    def entries(self, label: str, names) -> list[tk.StringVar]:
+        """A row of short text boxes, blank to start; changes apply on Return or leaving one."""
+        self.heading(label)
+        frame = ttk.Frame(self)
+        frame.pack(anchor="w")
+        made = []
+        for name in names:
+            ttk.Label(frame, text=name).pack(side="left", padx=(0, 4))
+            var = tk.StringVar()
+            box = ttk.Entry(frame, textvariable=var, width=7)
+            box.pack(side="left", padx=(0, 10))
+            for event in ("<Return>", "<FocusOut>"):
+                box.bind(event, lambda _event: self.on_change())
+            made.append(var)
+        return made
 
     def buttons(self, actions: list[tuple[str, Callable[[], None]]]) -> dict[str, ttk.Button]:
         frame = ttk.Frame(self)
@@ -247,6 +268,8 @@ class CompareTab(_Tab):
         self.finger = side.combo("Finger", FINGER_WIDTHS_MM, s.finger)
         side.heading("Realism layers")
         self.layers = {attr: side.check(name, getattr(s, attr)) for name, attr in LAYERS.items()}
+        self.damping = side.radios("Damping", DAMPING_MODES, s.damping, inline=True)
+        self.sigmas = side.entries("σ0, σ2 (blank: the string's own)", ("σ0", "σ2"))
         side.heading("Calibration")
         self.calibrated = side.check(
             "use profile" if state.profile else "no profile loaded",
@@ -270,12 +293,26 @@ class CompareTab(_Tab):
             note=self.note.get(),
             finger=self.finger.get(),
             calibrated=self.calibrated.get(),
+            damping=self.damping.get(),
+            sigma0=self._sigma("σ0", self.sigmas[0]),
+            sigma2=self._sigma("σ2", self.sigmas[1]),
             **{attr: var.get() for attr, var in self.layers.items()},
         )
         return (
             Settings(position_mm=self.position_mm("Pluck A", self.a.get(), self.state), **common),
             Settings(position_mm=self.position_mm("Pluck B", self.b.get(), self.state), **common),
         )
+
+    @staticmethod
+    def _sigma(name: str, var: tk.StringVar) -> float | None:
+        """A typed damping value, or None (blank) for the string's own."""
+        text = var.get().strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            raise ValueError(f"{name}: give a number, or leave it blank") from None
 
     def audio(self) -> tuple[np.ndarray, np.ndarray]:
         """Both plucks, matched in loudness (kept until the settings change)."""

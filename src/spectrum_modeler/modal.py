@@ -90,7 +90,9 @@ def coefficients(
     Realism layers switched on in ``opts`` are applied on top (design §2.3). With
     a guitar profile, its calibrated values replace the defaults: tuning, length,
     damping (measured per harmonic where available), stiffness, finger width,
-    body response, and any per-harmonic manual offsets.
+    body response, and any per-harmonic manual offsets. ``opts.sigma0`` and
+    ``opts.sigma2`` override the string's (or profile's); the returned ``string``
+    carries the values used.
     """
     opts = opts or ModelOptions()
     profile = _resolve_profile(opts.profile)
@@ -100,6 +102,13 @@ def coefficients(
         if width is not None:
             pluck = dataclasses.replace(pluck, width_mm=width)
     calibrated = profile is not None and string.note in profile.strings
+    adjusted = opts.sigma0 is not None or opts.sigma2 is not None
+    if adjusted:
+        string = dataclasses.replace(
+            string,
+            sigma0=string.sigma0 if opts.sigma0 is None else opts.sigma0,
+            sigma2=string.sigma2 if opts.sigma2 is None else opts.sigma2,
+        )
 
     beta = pluck.beta(string.length)
     n = np.arange(1, opts.n_harmonics + 1)
@@ -138,12 +147,15 @@ def coefficients(
     if calibrated:
         amps = amps * 10 ** (profile.offsets_db(string.note, n) / 20)
 
-    if not opts.damping:
-        decay_rates = np.zeros_like(freqs, dtype=float)
-    elif calibrated:
-        decay_rates = profile.decay_rates(string.note, n, freqs)
-    else:
-        decay_rates = string.sigma0 + string.sigma2 * freqs**2
+    match opts.damping:
+        case "off":
+            decay_rates = np.zeros_like(freqs, dtype=float)
+        case "flat":
+            decay_rates = np.full_like(freqs, string.sigma0, dtype=float)
+        case "full" if calibrated and not adjusted:
+            decay_rates = profile.decay_rates(string.note, n, freqs)
+        case "full":
+            decay_rates = string.sigma0 + string.sigma2 * freqs**2
 
     return ModalSpectrum(
         string=string,

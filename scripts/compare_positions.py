@@ -10,6 +10,8 @@ Examples:
     python scripts/compare_positions.py                      # all strings, ponticello vs tasto
     python scripts/compare_positions.py --string E2 --a 40 --b twelfth_fret
     python scripts/compare_positions.py --finger nail --body --no-damping
+    python scripts/compare_positions.py --damping flat       # every partial decays together
+    python scripts/compare_positions.py --sigma2 0.5e-6      # less high-frequency loss
     python scripts/compare_positions.py --detail             # also plot mode decompositions
     python scripts/compare_positions.py --profile my_guitar  # calibrated to your guitar
 """
@@ -26,7 +28,7 @@ import matplotlib.pyplot as plt
 from spectrum_modeler.analysis import spectrogram
 from spectrum_modeler.audio import match_loudness, sequence, write_wav
 from spectrum_modeler.modal import coefficients
-from spectrum_modeler.params import OBSERVABLES, ModelOptions
+from spectrum_modeler.params import DAMPING_MODES, OBSERVABLES, ModelOptions
 from spectrum_modeler.presets import (
     DEFAULT_SCALE_LENGTH,
     FINGER_WIDTHS_MM,
@@ -77,7 +79,19 @@ def main() -> None:
         "--scale-length", type=float, default=DEFAULT_SCALE_LENGTH * 1000, help="mm"
     )
     layers = parser.add_argument_group("realism layers")
-    layers.add_argument("--no-damping", action="store_true")
+    layers.add_argument(
+        "--damping",
+        default="full",
+        choices=DAMPING_MODES,
+        help="full: sigma0 + sigma2 f^2; flat: sigma0 only; off: no decay",
+    )
+    layers.add_argument(
+        "--no-damping", dest="damping", action="store_const", const="off", help="--damping off"
+    )
+    layers.add_argument("--sigma0", type=float, help="1/s, replaces the string's (or profile's)")
+    layers.add_argument(
+        "--sigma2", type=float, help="1/(s Hz^2), replaces the string's (or profile's)"
+    )
     layers.add_argument("--no-finger-width", action="store_true")
     layers.add_argument(
         "--inharmonicity",
@@ -104,11 +118,13 @@ def main() -> None:
     opts = ModelOptions(
         n_harmonics=args.harmonics,
         observable=args.observable,
-        damping=not args.no_damping,
+        damping=args.damping,
         finger_width=not args.no_finger_width,
         inharmonicity=True if args.inharmonicity is not None else None,
         body=True if args.body else None,
         profile=args.profile,
+        sigma0=args.sigma0,
+        sigma2=args.sigma2,
     )
     pluck_a = pluck(args.a, length=length, finger=args.finger)
     pluck_b = pluck(args.b, length=length, finger=args.finger)

@@ -1,3 +1,4 @@
+import copy
 import time
 
 import matplotlib.pyplot as plt
@@ -6,7 +7,7 @@ import pytest
 
 from spectrum_modeler.audio import rms
 from spectrum_modeler.calibrate import calibrate
-from spectrum_modeler.explorer import EDGE_MM, ExplorerState
+from spectrum_modeler.explorer import EDGE_MM, ExplorerState, Settings
 from spectrum_modeler.presets import OPEN_STRING_NOTES
 from spectrum_modeler.recording import SAMPLE_RATE
 
@@ -69,6 +70,59 @@ def test_missing_stiffness_is_explained():
     assert any("stiffness" in notice for notice in state.notices())
 
 
+def test_damping_modes_and_overrides():
+    state = ExplorerState()
+    full = state.ring_times()
+    assert full[1] > 5 * full[40]  # high harmonics die first
+
+    state.update(damping="flat")
+    flat = state.ring_times()
+    assert flat[1] == pytest.approx(flat[40]) == pytest.approx(np.log(1000) / 1.0)
+    assert "flat damping" in state.settings.describe()
+
+    state.update(damping="full", sigma2=0.5e-6)
+    assert state.damping_values() == (1.0, 0.5e-6)
+    assert "σ2 5.0e-07" in state.settings.describe()
+    assert state.ring_times()[40] > 2 * full[40]
+    state.update(note="A2")  # overrides are kept from string to string
+    assert state.damping_values()[1] == 0.5e-6
+
+    state.update(damping="off")
+    assert "forever" in "\n".join(state.readout())
+    state.update(damping="flat", sigma0=0.0)
+    assert "h1 forever" in "\n".join(state.readout())
+
+    with pytest.raises(ValueError, match="damping"):
+        state.update(damping="heavy")
+    with pytest.raises(ValueError, match="sigma0"):
+        state.update(sigma0=-1)
+    with pytest.raises(ValueError, match="sigma2"):
+        Settings(sigma2=-1e-6)  # as the Compare tab builds them
+
+
+def test_damping_is_audible():
+    state = ExplorerState()
+    state.update(damping="off")
+    undamped = state.audio(duration=2.0)
+    state.update(damping="full")
+    damped = state.audio(duration=2.0)
+    late = slice(SAMPLE_RATE, 2 * SAMPLE_RATE)
+    assert rms(damped[late]) < 0.5 * rms(undamped[late])
+
+
+def test_calibrated_ring_times_are_measured_until_adjusted(profile):
+    state = ExplorerState(profile=profile)
+    assert "(measured)" in "\n".join(state.readout())
+    fitted = profile.damping(state.settings.note)
+    assert state.damping_values() == pytest.approx(fitted)
+    state.update(sigma2=fitted[1])
+    assert "(measured)" not in "\n".join(state.readout())
+
+    tuned = copy.deepcopy(profile)  # a manual adjustment in the tuner also uses the formula
+    tuned.manual_for(state.settings.note).sigma0 = fitted[0]
+    assert "(measured)" not in "\n".join(ExplorerState(profile=tuned).readout())
+
+
 def test_pin_and_ab_audio_are_loudness_matched():
     state = ExplorerState()
     with pytest.raises(ValueError, match="Pin"):
@@ -118,4 +172,28 @@ def test_window_builds_updates_quickly_and_pins(profile):
     assert app.state.settings.note == "E4"
     app.calibrated.set_active(0)  # untick calibration
     assert not app.state.settings.calibrated
+
+    app.damping.set_active(1)
+    assert app.state.settings.damping == "flat"
+    assert app.sigma2.poly.get_alpha() < 1 and app.sigma0.poly.get_alpha() == 1  # flat ignores σ2
+    app.sigma0.set_val(2.0)
+    app.sigma2.set_val(0.5)
+    assert (app.state.settings.sigma0, app.state.settings.sigma2) == (2.0, pytest.approx(5e-7))
+    app.reset_damping._observers.process("clicked", None)
+    assert app.state.settings.sigma0 is None
+    assert app.sigma0.val == pytest.approx(1.0) and app.sigma2.val == pytest.approx(2.0)
+    plt.close(app.fig)
+
+
+def test_window_sliders_follow_the_calibrated_string(profile):
+    from spectrum_modeler.viz.explorer import ExplorerApp
+
+    app = ExplorerApp(ExplorerState(profile=profile))
+    app.fig.canvas.draw_idle = lambda *args, **kwargs: None
+    for note in profile.strings:
+        app.strings.set_active(OPEN_STRING_NOTES.index(note))
+        sigma0, sigma2 = profile.damping(note)
+        assert app.sigma0.val == pytest.approx(sigma0)
+        assert app.sigma2.val == pytest.approx(sigma2 * 1e6)
+        assert app.state.settings.sigma0 is None  # showing a value doesn't override it
     plt.close(app.fig)

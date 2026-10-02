@@ -6,6 +6,7 @@ from matplotlib.widgets import Button, CheckButtons, RadioButtons, Slider
 
 from ..explorer import DISPLAY_HARMONICS, EDGE_MM, ExplorerState
 from ..modal import envelope_nulls, initial_shape
+from ..params import DAMPING_MODES
 from ..presets import FINGER_WIDTHS_MM, OPEN_STRING_NOTES
 from ..recording import SAMPLE_RATE
 from .shape import frame_string_axes
@@ -15,8 +16,7 @@ from .style import C, button_props, check_props, radio_props, slider_props, use_
 FLOOR_DB = -60.0
 QUARTERS = ((0.25, "L/4"), (0.5, "L/2"), (0.75, "3L/4"))
 
-LAYERS = {"damping": "damping", "finger width": "finger_width",
-          "stiffness": "inharmonicity", "body": "body"}  # fmt: skip
+LAYERS = {"finger width": "finger_width", "stiffness": "inharmonicity", "body": "body"}
 
 
 class ExplorerApp:
@@ -29,7 +29,7 @@ class ExplorerApp:
         s = state.settings
         self.fig = fig if fig is not None else plt.figure(figsize=(14, 8.5))
         self.shape_ax = self.fig.add_axes((0.06, 0.72, 0.6, 0.2))
-        self.spectrum_ax = self.fig.add_axes((0.06, 0.25, 0.6, 0.38))
+        self.spectrum_ax = self.fig.add_axes((0.06, 0.37, 0.6, 0.26))
 
         def panel(rect, title):
             ax = self.fig.add_axes(rect)
@@ -63,7 +63,7 @@ class ExplorerApp:
             panel((0.72, 0.44, 0.11, 0.1), "Calibration"), [label], [s.calibrated], **check_props()
         )
         self.position = Slider(
-            self.fig.add_axes((0.2, 0.14, 0.46, 0.03)),
+            self.fig.add_axes((0.2, 0.255, 0.46, 0.03)),
             "Pluck distance from saddle (mm)",
             EDGE_MM,
             state.max_position_mm,
@@ -82,11 +82,36 @@ class ExplorerApp:
                 textcoords="offset points", ha="center", va="top", color=C.MUTED, fontsize=8,
             )  # fmt: skip
 
+        self.damping = RadioButtons(
+            panel((0.06, 0.1, 0.08, 0.1), "Damping"),
+            DAMPING_MODES,
+            active=DAMPING_MODES.index(s.damping),
+            activecolor=C.SERIES[0],
+            radio_props=radio_props(),
+        )
+        sigma0, sigma2 = state.damping_values()
+        self.sigma0 = Slider(
+            self.fig.add_axes((0.27, 0.165, 0.27, 0.025)), "σ0 (1/s)", 0, 5,
+            valinit=sigma0, valstep=0.05, valfmt="%.2f", **slider_props(),
+        )  # fmt: skip
+        self.sigma2 = Slider(
+            self.fig.add_axes((0.27, 0.12, 0.27, 0.025)), "σ2 (×10⁻⁶ /s/Hz²)", 0, 10,
+            valinit=sigma2 * 1e6, valstep=0.1, valfmt="%.1f", **slider_props(),
+        )  # fmt: skip
+        for slider in (self.sigma0, self.sigma2):
+            slider.label.set_x(-0.03)  # clear of the track
+        ax = self.fig.add_axes((0.6, 0.12, 0.06, 0.07))
+        self.reset_damping = Button(ax, "Reset σ", **button_props(ax))
+
         self.strings.on_clicked(lambda note: self._change(note=note))
         self.fingers.on_clicked(lambda finger: self._change(finger=finger))
         self.layers.on_clicked(lambda name: self._change(**{LAYERS[name]: self._checked(name)}))
         self.calibrated.on_clicked(self._on_calibrated)
         self.position.on_changed(lambda mm: self._change(position_mm=mm))
+        self.damping.on_clicked(lambda mode: self._change(damping=mode))
+        self.sigma0.on_changed(lambda v: self._change(sigma0=v))
+        self.sigma2.on_changed(lambda v: self._change(sigma2=v * 1e-6))
+        self.reset_damping.on_clicked(lambda _event: self._change(sigma0=None, sigma2=None))
 
         self.buttons = {}
         actions = [
@@ -136,6 +161,25 @@ class ExplorerApp:
                 self.layers.eventson = False
                 self.layers.set_active(i)
                 self.layers.eventson = True
+
+    def _sync_damping(self) -> None:
+        """Sliders show the sigma0 and sigma2 in use (the string's own, unless overridden),
+        dimmed where the damping mode ignores them."""
+        mode = self.state.settings.damping
+        for slider, value, used in zip(
+            (self.sigma0, self.sigma2),
+            self.state.damping_values(),
+            (mode != "off", mode == "full"),
+            strict=True,
+        ):
+            value = value * 1e6 if slider is self.sigma2 else value
+            if slider.val != value:
+                slider.eventson = False
+                slider.set_val(value)
+                slider.eventson = True
+            slider.label.set_color(C.INK if used else C.MUTED)
+            slider.valtext.set_color(C.INK if used else C.MUTED)
+            slider.poly.set_alpha(1 if used else 0.35)
 
     def _pin(self) -> None:
         self.state.pin()
@@ -220,6 +264,7 @@ class ExplorerApp:
             self.pinned_dots.set_data([], [])
         self._legend(pinned is not None)
 
+        self._sync_damping()
         self.readout.set_text("\n".join(state.readout()))
         self.status.set_text(message)
         self.fig.canvas.draw_idle()

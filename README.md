@@ -36,9 +36,9 @@ python scripts/animate_string.py          # batch: slow-motion animation of the 
 
 **Open session…** and **Open profile…** (top of the window) load an analyzed session (for example `recordings/`) and a guitar profile (for example `calibration/my_guitar.json`); × closes either. The app reopens them next time (remembered in `~/.config/spectrum-modeler/app.json`). Exported files use the light theme.
 
-`compare_positions.py` writes to `output/`: spectra, spectrograms, one WAV per pluck, and an A-then-B WAV matched in loudness. Options: `--string E2`, `--a 40 --b twelfth_fret` (preset or mm), `--finger nail`, `--no-damping`, `--body`, `--inharmonicity 5e-5`, `--profile my_guitar`, `--detail` (mode decompositions).
+`compare_positions.py` writes to `output/`: spectra, spectrograms, one WAV per pluck, and an A-then-B WAV matched in loudness. Options: `--string E2`, `--a 40 --b twelfth_fret` (preset or mm), `--finger nail`, `--damping flat` (or `off`; `--no-damping` is `off`), `--sigma0 0.5`, `--sigma2 1e-6`, `--body`, `--inharmonicity 5e-5`, `--profile my_guitar`, `--detail` (mode decompositions).
 
-**Explorer** controls: string, finger, realism layers, calibrated/uncalibrated, and the pluck-position slider. **Pin as B** freezes the current settings for comparison. **Play A then B** plays both, matched in loudness. **Play recording** plays the recorded take nearest the current position (needs a session).
+**Explorer** controls: string, finger, realism layers, damping (full, flat: every partial decays at σ0, or off) with σ0/σ2 sliders, calibrated/uncalibrated, and the pluck-position slider. **Pin as B** freezes the current settings for comparison. **Play A then B** plays both, matched in loudness. **Play recording** plays the recorded take nearest the current position (needs a session).
 
 ## Calibrating to your guitar
 

@@ -74,7 +74,9 @@ def test_decay_rates_prefer_measured_until_damping_is_adjusted():
     freqs = n * 82.3
     formula = 0.9 + 1.5e-6 * freqs**2
     np.testing.assert_allclose(profile.decay_rates("E2", n, freqs), [0.95, formula[1], 1.2])
+    assert profile.uses_measured_decay("E2") and not profile.uses_measured_decay("G3")
     profile.manual_for("E2").sigma2 = 3e-6
+    assert not profile.uses_measured_decay("E2")
     np.testing.assert_allclose(profile.decay_rates("E2", n, freqs), 0.9 + 3e-6 * freqs**2)
 
 
@@ -151,6 +153,22 @@ def test_profile_layers_can_be_switched_off_explicitly():
     np.testing.assert_allclose(off.freqs, off.harmonics * 82.3)
     manual_width = coefficients(e2, p, ModelOptions(profile=profile, body=False))
     assert manual_width.pluck.width_mm == 12.0
+
+
+def test_damping_modes_and_overrides_with_a_profile():
+    e2, p = open_string("E2"), pluck("normal")
+
+    def rates(**options):
+        opts = ModelOptions(n_harmonics=3, profile=make_profile(), **options)
+        return coefficients(e2, p, opts)
+
+    measured = rates()
+    assert measured.decay_rates[0] == 0.95 and measured.decay_rates[2] == 1.2
+    np.testing.assert_allclose(rates(damping="flat").decay_rates, 0.9)  # the profile's sigma0
+    adjusted = rates(sigma2=1e-6)  # the formula everywhere, with the profile's sigma0
+    np.testing.assert_allclose(adjusted.decay_rates, 0.9 + 1e-6 * adjusted.freqs**2)
+    np.testing.assert_allclose(rates(damping="flat", sigma0=2.0).decay_rates, 2.0)
+    assert not rates(damping="off").decay_rates.any()
 
 
 def test_profile_by_name(tmp_path, monkeypatch):

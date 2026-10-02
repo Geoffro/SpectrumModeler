@@ -132,6 +132,28 @@ def test_damping_layer_follows_sigma_formula():
     assert np.all(np.diff(spectrum.decay_rates) > 0)  # higher harmonics die faster
 
 
+def test_flat_damping_decays_every_partial_together():
+    spectrum = coefficients(E2, pluck("normal"), ModelOptions(damping="flat"))
+    np.testing.assert_allclose(spectrum.decay_rates, E2.sigma0)
+
+
+def test_damping_modes_accept_booleans_and_reject_the_unknown():
+    assert ModelOptions(damping=True).damping == "full"
+    assert ModelOptions(damping=False).damping == "off"
+    with pytest.raises(ValueError, match="damping"):
+        ModelOptions(damping="heavy")
+    with pytest.raises(ValueError, match="sigma2"):
+        ModelOptions(sigma2=-1e-6)
+
+
+def test_sigma_overrides_replace_the_strings_values():
+    both = coefficients(E2, pluck("normal"), ModelOptions(sigma0=0.5, sigma2=0.0))
+    np.testing.assert_allclose(both.decay_rates, 0.5)
+    assert (both.string.sigma0, both.string.sigma2) == (0.5, 0.0)
+    only2 = coefficients(E2, pluck("normal"), ModelOptions(sigma2=1e-6))
+    np.testing.assert_allclose(only2.decay_rates, E2.sigma0 + 1e-6 * only2.freqs**2)
+
+
 def test_finger_width_is_a_gentle_low_pass():
     ideal = coefficients(E2, pluck("normal"), ModelOptions(finger_width=False))
     flesh = coefficients(E2, pluck("normal", finger="flesh"))

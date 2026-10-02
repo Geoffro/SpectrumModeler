@@ -96,6 +96,8 @@ $$
 
 $\sigma_0$ accounts for air and support losses, and $\sigma_2$ for internal friction in the string. High harmonics die out first, so the note gets darker over time. Where a calibration profile exists, the measured decay rate for each harmonic can be used directly.
 
+The layer has three modes: **full** (the formula above), **flat** ($\sigma_n = \sigma_0$ for every mode, so the tone doesn't darken), and **off** (no decay). $\sigma_0$ and $\sigma_2$ can be overridden for a run (`ModelOptions.sigma0`, `.sigma2`); with a profile, an override switches from the measured rates to the formula for every harmonic, as a manual adjustment does (§4.6).
+
 **(b) Finite plucking width.** A fingertip or nail of width $w$ rounds off the triangle's corner. As an approximation, smoothing the initial shape with a box of width $w$ multiplies each amplitude by
 
 $$
@@ -461,11 +463,13 @@ class PluckParams:
 class ModelOptions:
     n_harmonics: int = 40
     observable: Literal["displacement", "velocity", "bridge_force"] = "bridge_force"
-    damping: bool = True
+    damping: Literal["full", "flat", "off"] | bool = "full"  # True/False: full/off
     finger_width: bool = True
     inharmonicity: bool | None = None  # None: on if the profile provides B
     body: bool | None = None           # None: on with a profile (calibrated H)
     profile: str | Path | GuitarProfile | None = None  # calibrated values
+    sigma0: float | None = None        # overrides the string's (or profile's)
+    sigma2: float | None = None
 ```
 
 `measure.Measurement` holds one take: metadata (clip, take, note, pluck position, finger), $f_0$, $B$, $\sigma_0$, $\sigma_2$, off-series peaks, and per-harmonic arrays (frequency, window level, onset level, floor, decay rate, reliability).
@@ -508,7 +512,7 @@ Design principle: the computational code (`modal`, `synthesis`, `measure`, `cali
 5. **Model against recording.** Measured harmonic levels (bars) overlaid with the uncalibrated model (markers); the tuner shows the calibrated model the same way.
 6. **Spectrogram.** Of a recording or of synthesized audio, showing high harmonics decaying faster.
 7. **Calibration report.** The fitted $H(f)$ curve, the per-take errors, and the fitted β against the taped position.
-8. **Explorer** (a tab of the app, item 13). String and finger selectors, a pluck-position slider, realism-layer checkboxes, a calibrated/uncalibrated switch, and a readout of β, the spectral centroid, missing harmonics, and the nearest recording. **Pin as B** freezes the current settings and overlays them on the spectrum. **Play model**, **Play recording**, and **Play A then B** (matched in loudness) are the playback buttons. Artists are updated in place: about 1 ms per change plus the redraw.
+8. **Explorer** (a tab of the app, item 13). String and finger selectors, a pluck-position slider, realism-layer checkboxes, a damping mode (full, flat, off) with $\sigma_0$ and $\sigma_2$ sliders (they show the string's values until moved; **Reset σ** returns to them), a calibrated/uncalibrated switch, and a readout of β, the spectral centroid, missing harmonics, ring times (−60 dB at harmonics 1, 10, and 40, since the spectrum shows onset levels only), and the nearest recording. **Pin as B** freezes the current settings and overlays them on the spectrum. **Play model**, **Play recording**, and **Play A then B** (matched in loudness) are the playback buttons. Artists are updated in place: about 1 ms per change plus the redraw.
 9. **Brightness against position.** The spectral centroid (÷ $f_0$) against pluck distance, one line per finger type. In the uncalibrated model it is the same for every open string.
 10. **Tuner** (a tab of the app, item 13). See §4.6.
 11. **Recording comparison** (`scripts/compare_recordings.py`, logic in `compare.py`). Two recordings, each starting at a chosen pluck and running to the next, trimmed to the same length and matched in loudness (RMS). The panels:
